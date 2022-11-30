@@ -7,13 +7,17 @@ import time
 
 
 # Calculate distance
-def findDistance(x1, y1, x2, y2):
+def findDistance(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
     dist = m.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
     return dist
 
 
 # Calculate angle.
-def findAngle(x1, y1, x2, y2):
+def findAngle(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
     theta = m.acos((y2 - y1) * (-y1) / (m.sqrt(
         (x2 - x1) ** 2 + (y2 - y1) ** 2) * y1))
     degree = int(180 / m.pi) * theta
@@ -46,7 +50,11 @@ max_dur = 10.0
 frequency = 2500  # Set Frequency To 2500 Hertz
 duration = 1000  # Set Duration To 1000 ms == 1 second
 
-
+# max angles
+torso_inclination_max = 30
+neck_inclination_max = 11
+orientation = "left"
+    
 # Initilize frame counters.
 good_frames = 0
 bad_frames = 0
@@ -72,6 +80,7 @@ pose = mp_pose.Pose(model_complexity=2)
 if __name__ == "__main__":
     # For webcam input replace file name with 0.
     file_name = 'input.mp4'
+    
     cap = cv2.VideoCapture(0)
 
     # Meta.
@@ -80,11 +89,7 @@ if __name__ == "__main__":
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_size = (width, height)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    
-    # max angles
-    torso_inclination_max = 30
-    neck_inclination_max = 11
-    orientation = "left"
+   
 
     # Video writer.
     video_output = cv2.VideoWriter('output.mp4', fourcc, fps, frame_size)
@@ -111,28 +116,34 @@ if __name__ == "__main__":
 
         # Use lm and lmPose as representative of the following methods.
         lm = keypoints.pose_landmarks
-        lmPose = mp_pose.PoseLandmark
-
+        lmPose = mp_pose.PoseLandmark # Enum codes for body parts
+        
+        coords = {}
+        skip_frame = False
+        
         # Acquire the landmark coordinates.
         # Once aligned properly, left or right should not be a concern.      
-        # Left shoulder.
-        l_shldr_x = int(lm.landmark[lmPose.LEFT_SHOULDER].x * w)
-        l_shldr_y = int(lm.landmark[lmPose.LEFT_SHOULDER].y * h)
-        # Right shoulder
-        r_shldr_x = int(lm.landmark[lmPose.RIGHT_SHOULDER].x * w)
-        r_shldr_y = int(lm.landmark[lmPose.RIGHT_SHOULDER].y * h)
-        # Left ear.
-        r_ear_x = int(lm.landmark[lmPose.RIGHT_EAR].x * w)
-        r_ear_y = int(lm.landmark[lmPose.RIGHT_EAR].y * h)
-        # Left hip.
-        r_hip_x = int(lm.landmark[lmPose.RIGHT_HIP].x * w)
-        r_hip_y = int(lm.landmark[lmPose.RIGHT_HIP].y * h)
-        # right elbow
-        r_elbow_x = int(lm.landmark[lmPose.RIGHT_ELBOW].x * w)
-        r_elbow_y = int(lm.landmark[lmPose.RIGHT_ELBOW].y * h)
+        body_parts = {"left shoulder": lmPose.LEFT_SHOULDER,
+                      "right shoulder":lmPose.RIGHT_SHOULDER,
+                      "left ear":      lmPose.LEFT_EAR,
+                      "right ear":     lmPose.RIGHT_EAR,
+                      "left hip":      lmPose.LEFT_HIP,
+                      "right hip":     lmPose.RIGHT_HIP,
+                      "right elbow":   lmPose.RIGHT_ELBOW,
+                      "left elbow":   lmPose.LEFT_ELBOW,
+                }
+        for name in body_parts.keys():
+            try:
+                coords[name] = (int(lm.landmark[body_parts[name]].x * w),
+                                int(lm.landmark[body_parts[name]].y * h))
+            except AttributeError:
+                print("{name} not found".format(name=name))
+                skip_frame = True
 
+        if skip_frame:
+            continue
         # Calculate distance between left shoulder and right shoulder points.
-        offset = findDistance(l_shldr_x, l_shldr_y, r_shldr_x, r_shldr_y)
+        offset = findDistance(coords["left shoulder"], coords["right shoulder"])
 
         # Assist to align the camera to point at the side view of the person.
         # Offset threshold 30 is based on results obtained from analysis over 100 samples.
@@ -142,22 +153,24 @@ if __name__ == "__main__":
             cv2.putText(image, str(int(offset)) + ' Not Aligned', (w - 150, 30), font, 0.9, red, 2)
 
         # Calculate angles.
-        neck_inclination = findAngle(r_shldr_x, r_shldr_y, r_ear_x, r_ear_y)
-        torso_inclination = findAngle(r_hip_x, r_hip_y, r_shldr_x, r_shldr_y)
+        neck_inclination = findAngle(coords["right shoulder"], coords["right ear"])
+        torso_inclination = findAngle(coords["right hip"], coords["right shoulder"])
 
         # Draw landmarks.
-        cv2.circle(image, (r_shldr_x, r_shldr_y), 7, yellow, -1)
-        cv2.circle(image, (r_ear_x, r_ear_y), 7, yellow, -1)
-        cv2.circle(image, (r_elbow_x, r_elbow_y), 7, pink, -1)
+        cv2.circle(image, coords["right shoulder"], 7, yellow, -1)
+        cv2.circle(image, coords["right ear"], 7, yellow, -1)
+        cv2.circle(image, coords["right elbow"], 7, pink, -1)
 
         # Let's take y - coordinate of P3 100px above x1,  for display elegance.
         # Although we are taking y = 0 while calculating angle between P1,P2,P3.
-        cv2.circle(image, (r_shldr_x, r_shldr_y - 100), 7, dark_blue, -1)
-        cv2.circle(image, (l_shldr_x, l_shldr_y), 7, pink, -1)
-        cv2.circle(image, (r_hip_x, r_hip_y), 7, yellow, -1)
+        r_shldr_x, r_shldr_y = coords["right shoulder"]
+        cv2.circle(image, (r_shldr_x, r_shldr_y - 100) , 7, dark_blue, -1)
+        cv2.circle(image, coords["left shoulder"], 7, pink, -1)
+        cv2.circle(image, coords["right hip"], 7, yellow, -1)
 
         # Similarly, here we are taking y - coordinate 100px above x1. Note that
         # you can take any value for y, not necessarily 100 or 200 pixels.
+        r_hip_x, r_hip_y = coords["right hip"]
         cv2.circle(image, (r_hip_x, r_hip_y - 100), 7, dark_blue, -1)
 
         # Put text, Posture and angle inclination.
@@ -175,10 +188,10 @@ if __name__ == "__main__":
             cv2.putText(image, str(int(torso_inclination)), (r_hip_x + 10, r_hip_y), font, 0.9, light_green, 2)
 
             # Join landmarks.
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_ear_x, r_ear_y), green, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y - 100), green, 4)
-            cv2.line(image, (r_hip_x, r_hip_y), (r_shldr_x, r_shldr_y), green, 4)
-            cv2.line(image, (r_hip_x, r_hip_y), (r_hip_x, r_hip_y - 100), green, 4)
+            cv2.line(image, coords["right shoulder"], coords["right ear"], green, 4)
+            cv2.line(image, coords["right shoulder"], (r_shldr_x, r_shldr_y - 100), green, 4)
+            cv2.line(image, coords["right hip"], coords["right shoulder"], green, 4)
+            cv2.line(image, coords["right hip"], (r_hip_x, r_hip_y - 100), green, 4)
 
         else:
             good_frames = 0
@@ -189,10 +202,10 @@ if __name__ == "__main__":
             cv2.putText(image, str(int(torso_inclination)), (r_hip_x + 10, r_hip_y), font, 0.9, red, 2)
 
             # Join landmarks.
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_ear_x, r_ear_y), red, 4)
-            cv2.line(image, (r_shldr_x, r_shldr_y), (r_shldr_x, r_shldr_y - 100), red, 4)
-            cv2.line(image, (r_hip_x, r_hip_y), (r_shldr_x, r_shldr_y), red, 4)
-            cv2.line(image, (r_hip_x, r_hip_y), (r_hip_x, r_hip_y - 100), red, 4)
+            cv2.line(image, coords["right shoulder"], coords["right ear"], red, 4)
+            cv2.line(image, coords["right shoulder"], (r_shldr_x, r_shldr_y - 100), red, 4)
+            cv2.line(image, coords["right hip"], coords["right shoulder"], red, 4)
+            cv2.line(image, coords["right hip"], (r_hip_x, r_hip_y - 100), red, 4)
 
         # Calculate the time of remaining in a particular posture.
         good_time = (1 / fps) * good_frames
