@@ -53,7 +53,7 @@ duration = 1000  # Set Duration To 1000 ms == 1 second
 # max angles
 torso_inclination_max = 30
 neck_inclination_max = 11
-orientation = "left"
+orientation = "left "
     
 # Initilize frame counters.
 good_frames = 0
@@ -130,7 +130,7 @@ if __name__ == "__main__":
                       "left hip":      lmPose.LEFT_HIP,
                       "right hip":     lmPose.RIGHT_HIP,
                       "right elbow":   lmPose.RIGHT_ELBOW,
-                      "left elbow":   lmPose.LEFT_ELBOW,
+                      "left elbow":    lmPose.LEFT_ELBOW,
                 }
         for name in body_parts.keys():
             try:
@@ -151,26 +151,32 @@ if __name__ == "__main__":
             cv2.putText(image, str(int(offset)) + ' Aligned', (w - 150, 30), font, 0.9, green, 2)
         else:
             cv2.putText(image, str(int(offset)) + ' Not Aligned', (w - 150, 30), font, 0.9, red, 2)
-
+    
+    
+        mainOrient_shoulder = orientation + "shoulder"
+        mainOrient_hip = orientation + "hip"
+        mainOrient_ear = orientation + "ear"
+        oppOrient_shoulder = "right shoulder" if orientation == "left " else "left shoulder"
+        
         # Calculate angles.
-        neck_inclination = findAngle(coords["right shoulder"], coords["right ear"])
-        torso_inclination = findAngle(coords["right hip"], coords["right shoulder"])
+        neck_inclination = findAngle(coords[mainOrient_shoulder], coords[mainOrient_ear])
+        torso_inclination = findAngle(coords[mainOrient_hip], coords[mainOrient_shoulder])
 
         # Draw landmarks.
-        cv2.circle(image, coords["right shoulder"], 7, yellow, -1)
-        cv2.circle(image, coords["right ear"], 7, yellow, -1)
-        cv2.circle(image, coords["right elbow"], 7, pink, -1)
+        cv2.circle(image, coords[mainOrient_shoulder], 7, yellow, -1)
+        cv2.circle(image, coords[mainOrient_ear], 7, yellow, -1)
+        cv2.circle(image, coords[mainOrient_hip], 7, pink, -1)
 
         # Let's take y - coordinate of P3 100px above x1,  for display elegance.
         # Although we are taking y = 0 while calculating angle between P1,P2,P3.
-        r_shldr_x, r_shldr_y = coords["right shoulder"]
+        r_shldr_x, r_shldr_y = coords[mainOrient_shoulder]
         cv2.circle(image, (r_shldr_x, r_shldr_y - 100) , 7, dark_blue, -1)
-        cv2.circle(image, coords["left shoulder"], 7, pink, -1)
-        cv2.circle(image, coords["right hip"], 7, yellow, -1)
+        cv2.circle(image, coords[oppOrient_shoulder], 7, pink, -1) # Opposite orientation TO DO
+        cv2.circle(image, coords[mainOrient_hip], 7, yellow, -1)
 
         # Similarly, here we are taking y - coordinate 100px above x1. Note that
         # you can take any value for y, not necessarily 100 or 200 pixels.
-        r_hip_x, r_hip_y = coords["right hip"]
+        r_hip_x, r_hip_y = coords[mainOrient_hip]
         cv2.circle(image, (r_hip_x, r_hip_y - 100), 7, dark_blue, -1)
 
         # Put text, Posture and angle inclination.
@@ -179,33 +185,29 @@ if __name__ == "__main__":
 
         # Determine whether good posture or bad posture.
         # The threshold angles have been set based on intuition.
+        color1 = green
+        color2 = light_green
         if neck_inclination < neck_inclination_max and torso_inclination < torso_inclination_max:
             bad_frames = 0
             good_frames += 1
-            
-            cv2.putText(image, angle_text_string, (10, 30), font, 0.9, light_green, 2)
-            cv2.putText(image, str(int(neck_inclination)), (r_shldr_x + 10, r_shldr_y), font, 0.9, light_green, 2)
-            cv2.putText(image, str(int(torso_inclination)), (r_hip_x + 10, r_hip_y), font, 0.9, light_green, 2)
-
-            # Join landmarks.
-            cv2.line(image, coords["right shoulder"], coords["right ear"], green, 4)
-            cv2.line(image, coords["right shoulder"], (r_shldr_x, r_shldr_y - 100), green, 4)
-            cv2.line(image, coords["right hip"], coords["right shoulder"], green, 4)
-            cv2.line(image, coords["right hip"], (r_hip_x, r_hip_y - 100), green, 4)
+            color1 = green
+            color2 = light_green
 
         else:
             good_frames = 0
             bad_frames += 1
-
-            cv2.putText(image, angle_text_string, (10, 30), font, 0.9, red, 2)
-            cv2.putText(image, str(int(neck_inclination)), (r_shldr_x + 10, r_shldr_y), font, 0.9, red, 2)
-            cv2.putText(image, str(int(torso_inclination)), (r_hip_x + 10, r_hip_y), font, 0.9, red, 2)
-
-            # Join landmarks.
-            cv2.line(image, coords["right shoulder"], coords["right ear"], red, 4)
-            cv2.line(image, coords["right shoulder"], (r_shldr_x, r_shldr_y - 100), red, 4)
-            cv2.line(image, coords["right hip"], coords["right shoulder"], red, 4)
-            cv2.line(image, coords["right hip"], (r_hip_x, r_hip_y - 100), red, 4)
+            color1 = red
+            color2 = red
+        
+        cv2.putText(image, angle_text_string, (10, 30), font, 0.9, color2, 2)
+        cv2.putText(image, str(int(neck_inclination)), (r_shldr_x + 10, r_shldr_y), font, 0.9, color2, 2)
+        cv2.putText(image, str(int(torso_inclination)), (r_hip_x + 10, r_hip_y), font, 0.9, color2, 2)
+        
+        # Join landmarks.
+        cv2.line(image, coords[mainOrient_shoulder], coords[mainOrient_ear], color1, 4)
+        cv2.line(image, coords[mainOrient_shoulder], (r_shldr_x, r_shldr_y - 100), color1, 4)
+        cv2.line(image, coords[mainOrient_shoulder], coords[mainOrient_hip], color1, 4)
+        cv2.line(image, coords[mainOrient_hip], (r_hip_x, r_hip_y - 100), color1, 4)
 
         # Calculate the time of remaining in a particular posture.
         good_time = (1 / fps) * good_frames
