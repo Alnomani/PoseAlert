@@ -80,6 +80,11 @@ if __name__ == "__main__":
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_size = (width, height)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+    # max angles
+    torso_inclination_max = 30
+    neck_inclination_max = 11
+    orientation = "left"
 
     # Video writer.
     video_output = cv2.VideoWriter('output.mp4', fourcc, fps, frame_size)
@@ -161,7 +166,7 @@ if __name__ == "__main__":
 
         # Determine whether good posture or bad posture.
         # The threshold angles have been set based on intuition.
-        if neck_inclination < 11 and torso_inclination < 30:
+        if neck_inclination < neck_inclination_max and torso_inclination < torso_inclination_max:
             bad_frames = 0
             good_frames += 1
             
